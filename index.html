@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>提示词收藏馆 · Prompt Vault (同步版)</title>
+<style>
+  :root {
+    --bg: #f5f6fa; --panel: #ffffff; --text: #1f2330; --muted: #6b7280;
+    --border: #e6e8ef; --accent: #6366f1; --accent-soft: #eef0ff;
+    --danger: #ef4444; --green: #16a34a; --amber: #d97706;
+    --shadow: 0 2px 12px rgba(20,24,60,.06); --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5; min-height: 100vh;
+  }
+  header { background: var(--panel); border-bottom: 1px solid var(--border); padding: 16px 24px; position: sticky; top: 0; z-index: 50; }
+  .head-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .logo { font-size: 22px; font-weight: 700; letter-spacing: .5px; }
+  .logo span { color: var(--accent); }
+  .stats { display: flex; gap: 18px; margin-left: auto; color: var(--muted); font-size: 13px; align-items: center; }
+  .stats b { color: var(--text); font-size: 16px; }
+  .pill { font-size: 12px; padding: 3px 10px; border-radius: 20px; font-weight: 600; }
+  .pill.off { background: #f1f2f7; color: var(--muted); }
+  .pill.sync { background: var(--accent-soft); color: var(--accent); }
+  .pill.ok { background: #e7f7ee; color: var(--green); }
+  .pill.err { background: #fdeaea; color: var(--danger); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 22px 24px 60px; }
+  .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 22px; }
+  .search { flex: 1; min-width: 220px; position: relative; }
+  .search input { width: 100%; padding: 11px 14px 11px 38px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; background: var(--panel); }
+  .search svg { position: absolute; left: 12px; top: 11px; opacity: .45; }
+  select, .btn { border: 1px solid var(--border); background: var(--panel); color: var(--text); padding: 11px 14px; border-radius: 10px; font-size: 14px; cursor: pointer; }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  .btn-primary:hover { filter: brightness(1.05); }
+  .btn-ghost:hover { background: var(--accent-soft); }
+  .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); cursor: pointer; transition: transform .15s, box-shadow .15s; display: flex; flex-direction: column; }
+  .card:hover { transform: translateY(-3px); box-shadow: 0 8px 22px rgba(20,24,60,.1); }
+  .card .thumb { height: 160px; background: linear-gradient(135deg, #eef0ff, #f7f8ff); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; background-size: cover; background-position: center; }
+  .card .body { padding: 14px; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .card h3 { font-size: 16px; font-weight: 650; }
+  .card .tool { font-size: 12px; color: var(--accent); background: var(--accent-soft); padding: 2px 9px; border-radius: 20px; align-self: flex-start; font-weight: 600; }
+  .card .meta { font-size: 12px; color: var(--muted); margin-top: auto; display: flex; justify-content: space-between; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { font-size: 11px; color: var(--muted); background: #f1f2f7; padding: 2px 8px; border-radius: 6px; }
+  .empty { text-align: center; color: var(--muted); padding: 70px 20px; }
+  .empty .big { font-size: 46px; margin-bottom: 10px; }
+  .overlay { position: fixed; inset: 0; background: rgba(20,24,60,.45); display: none; align-items: flex-start; justify-content: center; z-index: 100; padding: 40px 16px; overflow: auto; }
+  .overlay.open { display: flex; }
+  .modal { background: var(--panel); border-radius: 18px; width: 100%; max-width: 560px; padding: 26px; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+  .modal h2 { font-size: 19px; margin-bottom: 18px; }
+  .field { margin-bottom: 15px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+  .field input, .field textarea, .field select { width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 14px; font-family: inherit; background: #fbfbfe; color: var(--text); }
+  .field textarea { resize: vertical; min-height: 96px; }
+  .row2 { display: flex; gap: 12px; } .row2 > div { flex: 1; }
+  .imgprev { width: 100%; height: 130px; border: 1px dashed var(--border); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; background-size: cover; background-position: center; cursor: pointer; overflow: hidden; }
+  .stars { font-size: 24px; cursor: pointer; user-select: none; }
+  .stars span { color: #d6d8e0; } .stars span.on { color: #f5b50a; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+  .detail-body img { width: 100%; border-radius: 12px; margin: 8px 0 14px; max-height: 320px; object-fit: cover; }
+  .detail-body .tool { color: var(--accent); font-weight: 600; }
+  .detail-body .content { background: #f7f8ff; border: 1px solid var(--accent-soft); border-radius: 10px; padding: 14px; font-size: 14px; white-space: pre-wrap; word-break: break-word; margin: 8px 0; }
+  .toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); background: #1f2330; color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 200; }
+  .toast.show { opacity: 1; }
+  .link { color: var(--accent); cursor: pointer; font-size: 13px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .syncbar { font-size: 13px; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<header>
+  <div class="head-row">
+    <div class="logo">提示词<span>收藏馆</span></div>
+    <div class="stats">
+      <div>共 <b id="statTotal">0</b> 条</div>
+      <div>工具 <b id="statTools">0</b> 种</div>
+      <div>标签 <b id="statTags">0</b> 个</div>
+      <span id="syncPill" class="pill off" onclick="openSync()">未同步</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="syncbar" id="syncbar" style="display:none">
+    <span id="syncText">同步未启用。点右上角「未同步」配置 GitHub 后端，即可多设备自动同步。</span>
+  </div>
+
+  <div class="toolbar">
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="search" placeholder="搜索标题、提示词内容、标签…" oninput="applyFilter()" />
+    </div>
+    <select id="filterTool" onchange="applyFilter()"><option value="">全部工具</option></select>
+    <select id="sortBy" onchange="applyFilter()">
+      <option value="new">最新优先</option><option value="old">最早优先</option><option value="rate">评分最高</option>
+    </select>
+    <button class="btn btn-ghost" onclick="exportJSON()">导出</button>
+    <button class="btn btn-ghost" onclick="document.getElementById('importFile').click()">导入</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importJSON(event)" />
+    <button class="btn btn-ghost" id="syncBtn" style="display:none" onclick="manualSync()">立即同步</button>
+    <button class="btn btn-primary" onclick="openModal()">+ 添加提示词</button>
+  </div>
+
+  <div id="grid" class="grid"></div>
+  <div id="empty" class="empty" style="display:none">
+    <div class="big">🗂️</div>
+    <div>还没有收藏任何提示词</div>
+    <div style="margin-top:8px"><span class="link" onclick="openModal()">添加第一条 →</span></div>
+  </div>
+</div>
+
+<!-- Add / Edit Modal -->
+<div class="overlay" id="formOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h2 id="formTitle">添加提示词</h2>
+    <div class="field"><label>标题 / 命名</label><input id="f_title" placeholder="例如：赛博朋克城市夜景" /></div>
+    <div class="row2">
+      <div class="field"><label>出图工具</label>
+        <select id="f_tool">
+          <option>Midjourney</option><option>Stable Diffusion</option><option>DALL·E 3</option>
+          <option>即梦 Jimeng</option><option>可灵 Kling</option><option>通义万相</option>
+          <option>文心一格</option><option>豆包</option><option>其他</option>
+        </select>
+      </div>
+      <div class="field"><label>评分</label>
+        <div class="stars" id="f_stars"><span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span></div>
+      </div>
+    </div>
+    <div class="field"><label>提示词内容</label><textarea id="f_content" placeholder="粘贴你那条出图效果好的完整提示词…"></textarea></div>
+    <div class="field"><label>效果预览图（可选，本地上传会自动压缩）</label>
+      <div class="imgprev" id="f_imgprev" onclick="document.getElementById('f_img').click()">点击上传 / 留空</div>
+      <input type="file" id="f_img" accept="image/*" style="display:none" onchange="handleImg(event)" />
+      <input id="f_imgurl" style="margin-top:8px" placeholder="或粘贴图片链接 URL" oninput="setImgURL(this.value)" />
+    </div>
+    <div class="field"><label>标签（逗号分隔）</label><input id="f_tags" placeholder="例如：人物, 写实, 电影感" /></div>
+    <div class="field"><label>备注 / 参数（可选）</label><textarea id="f_notes" placeholder="如采样步数、模型版本、负面提示词、调参心得…" style="min-height:60px"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="savePrompt()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="overlay" id="detailOverlay" onclick="if(event.target===this)closeDetail()">
+  <div class="modal detail-body">
+    <h2 id="d_title"></h2>
+    <div style="margin-bottom:8px"><span class="tool" id="d_tool"></span></div>
+    <img id="d_img" style="display:none" />
+    <div style="font-size:13px;color:var(--muted);margin-bottom:4px">提示词</div>
+    <div class="content" id="d_content"></div>
+    <div class="tags" id="d_tags" style="margin:6px 0 12px"></div>
+    <div id="d_notes" style="font-size:13px;color:var(--muted);white-space:pre-wrap"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="copyDetail()">复制提示词</button>
+      <button class="btn btn-ghost" id="d_edit" onclick="editFromDetail()">编辑</button>
+      <button class="btn btn-ghost" style="color:var(--danger)" onclick="deleteFromDetail()">删除</button>
+      <button class="btn btn-primary" onclick="closeDetail()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sync Settings Modal -->
+<div class="overlay" id="syncOverlay" onclick="if(event.target===this)closeSync()">
+  <div class="modal">
+    <h2>GitHub 同步设置</h2>
+    <div class="field"><label>GitHub 用户名 (owner)</label><input id="s_owner" placeholder="你的 GitHub 用户名" /></div>
+    <div class="field"><label>仓库名 (repo)</label><input id="s_repo" placeholder="例如 prompt-vault" /></div>
+    <div class="row2">
+      <div class="field"><label>分支</label><input id="s_branch" value="main" /></div>
+      <div class="field"><label>数据文件路径</label><input id="s_path" value="data/prompts.json" /></div>
+    </div>
+    <div class="field"><label>Personal Access Token</label>
+      <input id="s_token" type="password" placeholder="ghp_... 或 github_pat_..." autocomplete="off" />
+      <div class="hint">在 GitHub → Settings → Developer settings → Personal access tokens 生成，勾选 <b>repo</b> 权限。Token 仅保存在你本机浏览器，不上传任何第三方。</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="testConn()">测试连接</button>
+      <button class="btn btn-ghost" id="s_disable" style="display:none;color:var(--danger)" onclick="disableSync()">断开同步</button>
+      <button class="btn btn-primary" onclick="saveSync()">保存并启用</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY = 'prompt_vault_v1';
+const SYNC_KEY = 'prompt_vault_sync';
+const TOMB_KEY = 'prompt_vault_tomb';
+let prompts = load();
+let tombstones = loadTomb();
+let sync = loadSync();
+let editId = null, detailId = null, currentImg = '', currentRate = 0;
+
+function load() { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } }
+function loadTomb() { try { return JSON.parse(localStorage.getItem(TOMB_KEY)) || []; } catch { return []; } }
+function loadSync() { try { return JSON.parse(localStorage.getItem(SYNC_KEY)) || { enabled:false }; } catch { return { enabled:false }; } }
+function saveLocal() {
+  localStorage.setItem(KEY, JSON.stringify(prompts));
+  localStorage.setItem(TOMB_KEY, JSON.stringify(tombstones));
+}
+function saveSyncCfg() { localStorage.setItem(SYNC_KEY, JSON.stringify(sync)); }
+
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 1600); }
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------- GitHub backend ---------- */
+const API = 'https://api.github.com';
+function b64e(s){ return btoa(unescape(encodeURIComponent(s))); }
+function b64d(b){ return decodeURIComponent(escape(atob((b||'').replace(/\n/g,'')))); }
+function ghHeaders(){ return { 'Authorization': 'Bearer ' + sync.token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' }; }
+function encPath(p){ return p.split('/').map(encodeURIComponent).join('/'); }
+
+async function getRemoteFile() {
+  const url = `${API}/repos/${sync.owner}/${sync.repo}/contents/${encPath(sync.path)}?ref=${sync.branch}`;
+  const res = await fetch(url, { headers: ghHeaders() });
+  if (res.status === 404) return null;
+  if (res.status === 401) throw new Error('TOKEN_INVALID');
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const j = await res.json();
+  let data; try { data = JSON.parse(b64d(j.content)); } catch { data = { prompts: [], tombstones: [] }; }
+  return { sha: j.sha, data: data || { prompts: [], tombstones: [] } };
+}
+async function commitRemote(payload, sha) {
+  const url = `${API}/repos/${sync.owner}/${sync.repo}/contents/${encPath(sync.path)}`;
+  const body = { message: 'sync prompt vault', content: b64e(JSON.stringify(payload, null, 2)), branch: sync.branch };
+  if (sha) body.sha = sha;
+  const res = await fetch(url, { method: 'PUT', headers: ghHeaders(), body: JSON.stringify(body) });
+  if (res.status === 409) throw new Error('409');
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+function mergePrompts(a, b) {
+  const m = new Map();
+  [...a, ...b].forEach(p => { const ex = m.get(p.id); if (!ex || (p.updatedAt||0) > (ex.updatedAt||0)) m.set(p.id, p); });
+  return [...m.values()];
+}
+function union(a, b){ return [...new Set([...(a||[]), ...(b||[])])]; }
+
+async function pushSync() {
+  let attempt = 0;
+  while (attempt < 2) {
+    const remote = await getRemoteFile();
+    const merged = mergePrompts(remote?.data.prompts || [], prompts);
+    const tomb = union(remote?.data.tombstones || [], tombstones);
+    const payload = { prompts: merged, tombstones: tomb };
+    try { await commitRemote(payload, remote?.sha); prompts = merged; tombstones = tomb; saveLocal(); return true; }
+    catch (e) { if (e.message === '409' && attempt === 0) { attempt++; continue; } throw e; }
+  }
+}
+async function pullSync() {
+  const remote = await getRemoteFile();
+  if (!remote) { await pushSync(); return; }
+  let merged = mergePrompts(remote.data.prompts || [], prompts);
+  const tomb = union(remote.data.tombstones || [], tombstones);
+  merged = merged.filter(p => !tomb.includes(p.id));
+  prompts = merged; tombstones = tomb; saveLocal();
+}
+
+function setPill(state, text) {
+  const p = document.getElementById('syncPill');
+  p.className = 'pill ' + state; p.textContent = text; p.onclick = openSync;
+}
+async function persist() {
+  saveLocal();
+  if (sync.enabled) {
+    setPill('sync', '同步中…');
+    try { await pushSync(); setPill('ok', '已同步 ✓'); }
+    catch (e) { setPill('err', e.message === 'TOKEN_INVALID' ? 'Token 失效' : '同步失败'); toast('同步失败：' + (e.message === 'TOKEN_INVALID' ? 'Token 无效或权限不足' : e.message)); }
+  }
+}
+async function manualSync() {
+  setPill('sync', '同步中…');
+  try { await pullSync(); setPill('ok', '已同步 ✓'); applyFilter(); toast('已拉取最新'); }
+  catch (e) { setPill('err', '同步失败'); toast('拉取失败：' + e.message); }
+}
+
+/* ---------- UI: stats / filter / render ---------- */
+function refreshStats() {
+  const tools = new Set(prompts.map(p => p.tool));
+  const tags = new Set(); prompts.forEach(p => (p.tags||[]).forEach(t => tags.add(t)));
+  document.getElementById('statTotal').textContent = prompts.length;
+  document.getElementById('statTools').textContent = tools.size;
+  document.getElementById('statTags').textContent = tags.size;
+  const sel = document.getElementById('filterTool'); const cur = sel.value;
+  sel.innerHTML = '<option value="">全部工具</option>' + [...tools].map(t => `<option>${escapeHtml(t)}</option>`).join('');
+  if ([...tools].includes(cur)) sel.value = cur;
+}
+function applyFilter() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const tool = document.getElementById('filterTool').value;
+  const sort = document.getElementById('sortBy').value;
+  let list = prompts.filter(p => {
+    if (tool && p.tool !== tool) return false;
+    if (q) { const hay = (p.title+' '+p.content+' '+(p.tags||[]).join(' ')+' '+(p.notes||'')).toLowerCase(); if (!hay.includes(q)) return false; }
+    return true;
+  });
+  list.sort((a,b)=> sort==='rate' ? (b.rating||0)-(a.rating||0) : sort==='old' ? a.createdAt-b.createdAt : b.createdAt-a.createdAt);
+  render(list);
+}
+function render(list) {
+  const grid = document.getElementById('grid'); const empty = document.getElementById('empty');
+  if (!list.length) { grid.innerHTML=''; empty.style.display='block'; empty.querySelector('div:nth-child(2)').textContent = prompts.length ? '没有匹配的结果' : '还没有收藏任何提示词'; return; }
+  empty.style.display='none';
+  grid.innerHTML = list.map(p => `
+    <div class="card" onclick="openDetail('${p.id}')">
+      <div class="thumb" style="${p.image ? `background-image:url('${escapeHtml(p.image)}')` : ''}">${p.image ? '' : '无预览图'}</div>
+      <div class="body">
+        <span class="tool">${escapeHtml(p.tool || '未分类')}</span>
+        <h3>${escapeHtml(p.title || '未命名')}</h3>
+        <div class="tags">${(p.tags||[]).slice(0,3).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>
+        <div class="meta"><span>${'★'.repeat(p.rating||0)}${'☆'.repeat(5-(p.rating||0))}</span><span>${new Date(p.createdAt).toLocaleDateString('zh-CN')}</span></div>
+      </div>
+    </div>`).join('');
+}
+
+/* ---------- Form ---------- */
+function openModal(id) {
+  editId = id || null; currentImg=''; currentRate=0;
+  document.getElementById('formTitle').textContent = id ? '编辑提示词' : '添加提示词';
+  const p = id ? prompts.find(x => x.id === id) : null;
+  document.getElementById('f_title').value = p?.title || '';
+  document.getElementById('f_tool').value = p?.tool || 'Midjourney';
+  document.getElementById('f_content').value = p?.content || '';
+  document.getElementById('f_tags').value = (p?.tags||[]).join(', ');
+  document.getElementById('f_notes').value = p?.notes || '';
+  document.getElementById('f_imgurl').value = p?.image && !p.image.startsWith('data:') ? p.image : '';
+  currentImg = p?.image || ''; setImgPreview(currentImg); setStars(p?.rating || 0);
+  document.getElementById('formOverlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('formOverlay').classList.remove('open'); }
+function setStars(n){ currentRate=n; [...document.getElementById('f_stars').children].forEach(s=>s.classList.toggle('on', +s.dataset.v<=n)); }
+document.getElementById('f_stars').addEventListener('click', e => { if (e.target.dataset.v) setStars(+e.target.dataset.v); });
+function setImgPreview(src){ const el=document.getElementById('f_imgprev'); if(src){el.style.backgroundImage=`url('${src}')`;el.textContent='';}else{el.style.backgroundImage='';el.textContent='点击上传 / 留空';} }
+function setImgURL(v){ if(v){ currentImg=v; setImgPreview(v); } }
+function handleImg(e){
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=evt=>compressImage(evt.target.result, data=>{ currentImg=data; setImgPreview(data); document.getElementById('f_imgurl').value=''; });
+  reader.readAsDataURL(file);
+}
+function compressImage(dataUrl, cb){
+  const img=new Image(); img.onload=()=>{ let {width,height}=img; const max=900; if(width>max||height>max){const r=Math.min(max/width,max/height);width=Math.round(width*r);height=Math.round(height*r);} const c=document.createElement('canvas'); c.width=width;c.height=height; c.getContext('2d').drawImage(img,0,0,width,height); cb(c.toDataURL('image/jpeg',0.8)); }; img.src=dataUrl;
+}
+async function savePrompt() {
+  const title=document.getElementById('f_title').value.trim();
+  const content=document.getElementById('f_content').value.trim();
+  if(!title && !content){ toast('请至少填写标题或提示词内容'); return; }
+  const tags=document.getElementById('f_tags').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const now=Date.now();
+  const data={ title, content, tool:document.getElementById('f_tool').value, rating:currentRate, tags, notes:document.getElementById('f_notes').value.trim(), image:currentImg, updatedAt:now };
+  if(editId){ const i=prompts.findIndex(p=>p.id===editId); prompts[i]={...prompts[i],...data}; toast('已更新'); }
+  else { data.id='p'+now+Math.random().toString(36).slice(2,6); data.createdAt=now; prompts.push(data); toast('已添加'); }
+  closeModal(); refreshStats(); applyFilter(); await persist();
+}
+
+/* ---------- Detail ---------- */
+function openDetail(id){
+  const p=prompts.find(x=>x.id===id); if(!p) return; detailId=id;
+  document.getElementById('d_title').textContent=p.title||'未命名';
+  document.getElementById('d_tool').textContent=p.tool||'';
+  const img=document.getElementById('d_img');
+  if(p.image){img.src=p.image;img.style.display='block';}else img.style.display='none';
+  document.getElementById('d_content').textContent=p.content||'';
+  document.getElementById('d_tags').innerHTML=(p.tags||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('');
+  document.getElementById('d_notes').textContent=p.notes?'备注：'+p.notes:'';
+  document.getElementById('detailOverlay').classList.add('open');
+}
+function closeDetail(){ document.getElementById('detailOverlay').classList.remove('open'); }
+function copyDetail(){ const p=prompts.find(x=>x.id===detailId); navigator.clipboard?.writeText(p.content||'').then(()=>toast('提示词已复制')).catch(()=>toast('复制失败')); }
+function editFromDetail(){ closeDetail(); openModal(detailId); }
+async function deleteFromDetail(){
+  if(!confirm('确定删除这条提示词？')) return;
+  tombstones.push(detailId);
+  prompts=prompts.filter(p=>p.id!==detailId);
+  closeDetail(); refreshStats(); applyFilter(); await persist(); toast('已删除');
+}
+
+/* ---------- Import / Export ---------- */
+function exportJSON(){
+  if(!prompts.length){ toast('还没有数据可导出'); return; }
+  const blob=new Blob([JSON.stringify(prompts,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='prompt-vault-'+new Date().toISOString().slice(0,10)+'.json'; a.click(); toast('已导出备份');
+}
+function importJSON(e){
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=()=>{ try{
+    const data=JSON.parse(reader.result);
+    if(!Array.isArray(data)) throw 0;
+    const mapped=data.map(p=>({ id:p.id||'p'+Date.now()+Math.random().toString(36).slice(2,6), title:p.title||'', content:p.content||'', tool:p.tool||'其他', rating:p.rating||0, tags:p.tags||[], notes:p.notes||'', image:p.image||'', createdAt:p.createdAt||Date.now(), updatedAt:p.updatedAt||Date.now() }));
+    prompts=prompts.concat(mapped); persist().then(()=>{ refreshStats(); applyFilter(); toast(`已导入 ${mapped.length} 条`); });
+  }catch{ toast('导入失败：文件格式不正确'); } };
+  reader.readAsText(file); e.target.value='';
+}
+
+/* ---------- Sync settings ---------- */
+function openSync(){
+  document.getElementById('s_owner').value=sync.owner||'';
+  document.getElementById('s_repo').value=sync.repo||'';
+  document.getElementById('s_branch').value=sync.branch||'main';
+  document.getElementById('s_path').value=sync.path||'data/prompts.json';
+  document.getElementById('s_token').value=sync.token||'';
+  document.getElementById('s_disable').style.display=sync.enabled?'inline-block':'none';
+  document.getElementById('syncOverlay').classList.add('open');
+}
+function closeSync(){ document.getElementById('syncOverlay').classList.remove('open'); }
+async function testConn(){
+  const owner=document.getElementById('s_owner').value.trim();
+  const repo=document.getElementById('s_repo').value.trim();
+  const token=document.getElementById('s_token').value.trim();
+  if(!owner||!repo||!token){ toast('请先填写用户名、仓库名和 Token'); return; }
+  const save={...sync, owner, repo, branch:document.getElementById('s_branch').value.trim()||'main', path:document.getElementById('s_path').value.trim()||'data/prompts.json', token};
+  sync=save;
+  try{ await getRemoteFile(); toast('连接成功 ✓'); }
+  catch(e){ toast(e.message==='TOKEN_INVALID'?'Token 无效或权限不足':'连接失败：'+e.message); }
+}
+async function saveSync(){
+  const owner=document.getElementById('s_owner').value.trim();
+  const repo=document.getElementById('s_repo').value.trim();
+  const token=document.getElementById('s_token').value.trim();
+  if(!owner||!repo||!token){ toast('请完整填写用户名、仓库名和 Token'); return; }
+  sync={ enabled:true, owner, repo, branch:document.getElementById('s_branch').value.trim()||'main', path:document.getElementById('s_path').value.trim()||'data/prompts.json', token };
+  saveSyncCfg(); closeSync();
+  document.getElementById('syncBtn').style.display='inline-block';
+  setPill('sync','同步中…');
+  try{ await pullSync(); setPill('ok','已同步 ✓'); refreshStats(); applyFilter(); toast('同步已启用'); }
+  catch(e){ setPill('err','同步失败'); toast('启用失败：'+(e.message==='TOKEN_INVALID'?'Token 无效':'网络错误')); }
+}
+function disableSync(){
+  sync={ enabled:false, owner:sync.owner, repo:sync.repo, branch:sync.branch, path:sync.path, token:sync.token };
+  saveSyncCfg(); closeSync();
+  document.getElementById('syncBtn').style.display='none';
+  setPill('off','未同步');
+  document.getElementById('syncText').textContent='同步已断开，数据仅保存在本机浏览器。';
+  toast('已断开同步');
+}
+
+/* ---------- Init ---------- */
+function init(){
+  if(sync.enabled){
+    setPill('sync','同步中…');
+    document.getElementById('syncBtn').style.display='inline-block';
+    document.getElementById('syncText').textContent='已连接 GitHub 仓库 '+sync.owner+'/'+sync.repo+'，数据自动同步。';
+    pullSync().then(()=>{ setPill('ok','已同步 ✓'); refreshStats(); applyFilter(); })
+      .catch(e=>{ setPill('err', e.message==='TOKEN_INVALID'?'Token 失效':'同步失败'); refreshStats(); applyFilter(); toast('拉取失败，已使用本地数据'); });
+  } else {
+    setPill('off','未同步');
+    document.getElementById('syncbar').style.display='flex';
+    refreshStats(); applyFilter();
+  }
+}
+init();
+</script>
+</body>
+</html>
