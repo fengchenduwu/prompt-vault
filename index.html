@@ -70,6 +70,21 @@
   .link { color: var(--accent); cursor: pointer; font-size: 13px; }
   .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
   .syncbar { font-size: 13px; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .imglist { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+  .imgrow { display: flex; gap: 10px; align-items: center; border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: #fbfbfe; }
+  .imgrow .thumb2 { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; flex: none; background: #eef0ff; }
+  .imgrow .ctr { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .imgrow .ctr input { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; font-size: 13px; background: #fff; }
+  .imgrow .acts { display: flex; flex-direction: column; gap: 4px; }
+  .imgrow .acts button { border: 1px solid var(--border); background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px; padding: 2px 7px; color: var(--muted); }
+  .imgrow .acts button:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); }
+  .imgrow .acts button:disabled { opacity: .35; cursor: default; }
+  .addimg { border: 1px dashed var(--border); background: #fbfbfe; border-radius: 10px; padding: 10px; text-align: center; color: var(--accent); cursor: pointer; font-weight: 600; font-size: 13px; margin-top: 8px; }
+  .addimg:hover { background: var(--accent-soft); }
+  .detail-body .imgwrap { margin: 6px 0 12px; }
+  .detail-body .imgwrap img { width: 100%; border-radius: 12px; display: block; margin: 0; }
+  .detail-body .imgwrap .lbl { display: inline-block; font-size: 12px; font-weight: 600; color: var(--accent); background: var(--accent-soft); padding: 2px 9px; border-radius: 20px; margin-bottom: 6px; }
+  .imgcap { font-size: 12px; color: var(--muted); font-weight: 600; margin: 10px 0 2px; }
 </style>
 </head>
 <body>
@@ -132,11 +147,16 @@
       </div>
     </div>
     <div class="field"><label>提示词内容</label><textarea id="f_content" placeholder="粘贴你那条出图效果好的完整提示词…"></textarea></div>
-    <div class="field"><label>效果预览图（可选，本地上传会自动压缩）</label>
-      <div class="imgprev" id="f_imgprev" onclick="document.getElementById('f_img').click()">点击上传 / 留空</div>
+    <div class="field"><label>图片（可添加多张：成果预览图 / 底涂参考 / 原服装…）</label>
+      <div class="imglist" id="f_imglist"></div>
+      <div class="addimg" onclick="document.getElementById('f_img').click()">＋ 添加图片（本地自动压缩）</div>
       <input type="file" id="f_img" accept="image/*" style="display:none" onchange="handleImg(event)" />
-      <input id="f_imgurl" style="margin-top:8px" placeholder="或粘贴图片链接 URL" oninput="setImgURL(this.value)" />
+      <input id="f_imgurl" style="margin-top:8px" placeholder="或粘贴图片链接 URL（作为成果预览图）" oninput="setImgURL(this.value)" />
+      <div class="hint">首张默认「成果预览图」并作卡片封面；换装类建议再添加「原服装」，生成类可添加「底涂参考」。</div>
     </div>
+    <datalist id="imgLabels">
+      <option value="成果预览图"></option><option value="底涂参考"></option><option value="原服装"></option><option value="参考图"></option>
+    </datalist>
     <div class="field"><label>标签（逗号分隔）</label><input id="f_tags" placeholder="例如：人物, 写实, 电影感" /></div>
     <div class="field"><label>备注 / 参数（可选）</label><textarea id="f_notes" placeholder="如采样步数、模型版本、负面提示词、调参心得…" style="min-height:60px"></textarea></div>
     <div class="modal-actions">
@@ -151,7 +171,7 @@
   <div class="modal detail-body">
     <h2 id="d_title"></h2>
     <div style="margin-bottom:8px"><span class="tool" id="d_tool"></span></div>
-    <img id="d_img" style="display:none" />
+    <div id="d_imgs"></div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:4px">提示词</div>
     <div class="content" id="d_content"></div>
     <div class="tags" id="d_tags" style="margin:6px 0 12px"></div>
@@ -196,7 +216,7 @@ const TOMB_KEY = 'prompt_vault_tomb';
 let prompts = load();
 let tombstones = loadTomb();
 let sync = loadSync();
-let editId = null, detailId = null, currentImg = '', currentRate = 0;
+let editId = null, detailId = null, currentImg = '', currentRate = 0, currentImages = [];
 
 function load() { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } }
 function loadTomb() { try { return JSON.parse(localStorage.getItem(TOMB_KEY)) || []; } catch { return []; } }
@@ -209,6 +229,7 @@ function saveSyncCfg() { localStorage.setItem(SYNC_KEY, JSON.stringify(sync)); }
 
 function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 1600); }
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function getImages(p){ if(Array.isArray(p.images)&&p.images.length) return p.images; if(p.image) return [{label:'成果预览图',data:p.image}]; return []; }
 
 /* ---------- GitHub backend ---------- */
 const API = 'https://api.github.com';
@@ -310,7 +331,7 @@ function render(list) {
   empty.style.display='none';
   grid.innerHTML = list.map(p => `
     <div class="card" onclick="openDetail('${p.id}')">
-      ${p.image ? `<img src="${escapeHtml(p.image)}" alt="" />` : '<div class="thumb">无预览图</div>'}
+      ${getImages(p)[0] ? `<img src="${escapeHtml(getImages(p)[0].data)}" alt="" />` : '<div class="thumb">无预览图</div>'}
       <div class="body">
         <span class="tool">${escapeHtml(p.tool || '未分类')}</span>
         <h3>${escapeHtml(p.title || '未命名')}</h3>
@@ -323,26 +344,44 @@ function render(list) {
 /* ---------- Form ---------- */
 function openModal(id) {
   editId = id || null; currentImg=''; currentRate=0;
-  document.getElementById('formTitle').textContent = id ? '编辑提示词' : '添加提示词';
   const p = id ? prompts.find(x => x.id === id) : null;
+  currentImages = (id && p ? getImages(p) : []).map(x=>({...x}));
+  document.getElementById('formTitle').textContent = id ? '编辑提示词' : '添加提示词';
   document.getElementById('f_title').value = p?.title || '';
   document.getElementById('f_tool').value = p?.tool || 'Midjourney';
   document.getElementById('f_content').value = p?.content || '';
   document.getElementById('f_tags').value = (p?.tags||[]).join(', ');
   document.getElementById('f_notes').value = p?.notes || '';
-  document.getElementById('f_imgurl').value = p?.image && !p.image.startsWith('data:') ? p.image : '';
-  currentImg = p?.image || ''; setImgPreview(currentImg); setStars(p?.rating || 0);
+  document.getElementById('f_imgurl').value = (id&&p&&p.image&&!p.image.startsWith('data:')&&!currentImages.length) ? p.image : '';
+  renderImgList(); setStars(p?.rating || 0);
   document.getElementById('formOverlay').classList.add('open');
 }
 function closeModal(){ document.getElementById('formOverlay').classList.remove('open'); }
 function setStars(n){ currentRate=n; [...document.getElementById('f_stars').children].forEach(s=>s.classList.toggle('on', +s.dataset.v<=n)); }
 document.getElementById('f_stars').addEventListener('click', e => { if (e.target.dataset.v) setStars(+e.target.dataset.v); });
-function setImgPreview(src){ const el=document.getElementById('f_imgprev'); if(src){el.style.backgroundImage=`url('${src}')`;el.textContent='';}else{el.style.backgroundImage='';el.textContent='点击上传 / 留空';} }
-function setImgURL(v){ if(v){ currentImg=v; setImgPreview(v); } }
+function renderImgList(){
+  const box=document.getElementById('f_imglist');
+  if(!currentImages.length){ box.innerHTML='<div class="hint">暂无图片，点击下方「＋ 添加图片」上传。</div>'; return; }
+  box.innerHTML = currentImages.map((it,i)=>`
+    <div class="imgrow">
+      <img class="thumb2" src="${escapeHtml(it.data)}" alt="" />
+      <div class="ctr">
+        <input list="imgLabels" value="${escapeHtml(it.label||'')}" placeholder="图片标签，如 成果预览图 / 底涂参考 / 原服装" oninput="currentImages[${i}].label=this.value" />
+      </div>
+      <div class="acts">
+        <button onclick="moveImg(${i},-1)" ${i===0?'disabled':''} title="上移">↑</button>
+        <button onclick="moveImg(${i},1)" ${i===currentImages.length-1?'disabled':''} title="下移">↓</button>
+        <button onclick="removeImg(${i})" title="删除">✕</button>
+      </div>
+    </div>`).join('');
+}
+function moveImg(i,dir){ const j=i+dir; if(j<0||j>=currentImages.length) return; const t=currentImages[i]; currentImages[i]=currentImages[j]; currentImages[j]=t; renderImgList(); }
+function removeImg(i){ currentImages.splice(i,1); renderImgList(); }
+function setImgURL(v){ if(v){ if(!currentImages.length) currentImages.push({label:'成果预览图',data:v}); else currentImages[0].data=v; renderImgList(); } }
 function handleImg(e){
-  const file=e.target.files[0]; if(!file) return;
+  const file=e.target.files[0]; if(!file) return; e.target.value='';
   const reader=new FileReader();
-  reader.onload=evt=>compressImage(evt.target.result, data=>{ currentImg=data; setImgPreview(data); document.getElementById('f_imgurl').value=''; });
+  reader.onload=evt=>compressImage(evt.target.result, data=>{ currentImages.push({ label: currentImages.length ? '底涂参考' : '成果预览图', data }); renderImgList(); });
   reader.readAsDataURL(file);
 }
 function compressImage(dataUrl, cb){
@@ -353,8 +392,9 @@ async function savePrompt() {
   const content=document.getElementById('f_content').value.trim();
   if(!title && !content){ toast('请至少填写标题或提示词内容'); return; }
   const tags=document.getElementById('f_tags').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const imgs=currentImages.filter(x=>x&&x.data).map(x=>({label:x.label||'成果预览图', data:x.data}));
   const now=Date.now();
-  const data={ title, content, tool:document.getElementById('f_tool').value, rating:currentRate, tags, notes:document.getElementById('f_notes').value.trim(), image:currentImg, updatedAt:now };
+  const data={ title, content, tool:document.getElementById('f_tool').value, rating:currentRate, tags, notes:document.getElementById('f_notes').value.trim(), images:imgs, image:imgs[0]?imgs[0].data:'', updatedAt:now };
   if(editId){ const i=prompts.findIndex(p=>p.id===editId); prompts[i]={...prompts[i],...data}; toast('已更新'); }
   else { data.id='p'+now+Math.random().toString(36).slice(2,6); data.createdAt=now; prompts.push(data); toast('已添加'); }
   closeModal(); refreshStats(); applyFilter(); await persist();
@@ -365,8 +405,9 @@ function openDetail(id){
   const p=prompts.find(x=>x.id===id); if(!p) return; detailId=id;
   document.getElementById('d_title').textContent=p.title||'未命名';
   document.getElementById('d_tool').textContent=p.tool||'';
-  const img=document.getElementById('d_img');
-  if(p.image){img.src=p.image;img.style.display='block';}else img.style.display='none';
+  const imgs=getImages(p);
+  document.getElementById('d_imgs').innerHTML = imgs.length ? imgs.map(it=>`
+    <div class="imgwrap"><span class="lbl">${escapeHtml(it.label||'图片')}</span><img src="${escapeHtml(it.data)}" alt="" /></div>`).join('') : '<div class="hint">无预览图</div>';
   document.getElementById('d_content').textContent=p.content||'';
   document.getElementById('d_tags').innerHTML=(p.tags||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('');
   document.getElementById('d_notes').textContent=p.notes?'备注：'+p.notes:'';
@@ -395,7 +436,7 @@ function importJSON(e){
   reader.onload=()=>{ try{
     const data=JSON.parse(reader.result);
     if(!Array.isArray(data)) throw 0;
-    const mapped=data.map(p=>({ id:p.id||'p'+Date.now()+Math.random().toString(36).slice(2,6), title:p.title||'', content:p.content||'', tool:p.tool||'其他', rating:p.rating||0, tags:p.tags||[], notes:p.notes||'', image:p.image||'', createdAt:p.createdAt||Date.now(), updatedAt:p.updatedAt||Date.now() }));
+    const mapped=data.map(p=>({ id:p.id||'p'+Date.now()+Math.random().toString(36).slice(2,6), title:p.title||'', content:p.content||'', tool:p.tool||'其他', rating:p.rating||0, tags:p.tags||[], notes:p.notes||'', images:p.images||(p.image?[{label:'成果预览图',data:p.image}]:[]), image:p.image||(p.images&&p.images[0]?p.images[0].data:''), createdAt:p.createdAt||Date.now(), updatedAt:p.updatedAt||Date.now() }));
     prompts=prompts.concat(mapped); persist().then(()=>{ refreshStats(); applyFilter(); toast(`已导入 ${mapped.length} 条`); });
   }catch{ toast('导入失败：文件格式不正确'); } };
   reader.readAsText(file); e.target.value='';
