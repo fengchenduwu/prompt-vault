@@ -147,15 +147,15 @@
       </div>
     </div>
     <div class="field"><label>提示词内容</label><textarea id="f_content" placeholder="粘贴你那条出图效果好的完整提示词…"></textarea></div>
-    <div class="field"><label>图片（可添加多张：成果预览图 / 底涂参考 / 原服装…）</label>
+    <div class="field"><label>图片（可添加多张：成果预览图 / 底图参考 / 原服装…）</label>
       <div class="imglist" id="f_imglist"></div>
       <div class="addimg" onclick="document.getElementById('f_img').click()">＋ 添加图片（本地自动压缩）</div>
       <input type="file" id="f_img" accept="image/*" style="display:none" onchange="handleImg(event)" />
       <input id="f_imgurl" style="margin-top:8px" placeholder="或粘贴图片链接 URL（作为成果预览图）" oninput="setImgURL(this.value)" />
-      <div class="hint">首张默认「成果预览图」并作卡片封面；换装类建议再添加「原服装」，生成类可添加「底涂参考」。</div>
+      <div class="hint">首张默认「成果预览图」并作卡片封面；换装类建议再添加「原服装」，生成类可添加「底图参考」。</div>
     </div>
     <datalist id="imgLabels">
-      <option value="成果预览图"></option><option value="底涂参考"></option><option value="原服装"></option><option value="参考图"></option>
+      <option value="成果预览图"></option><option value="底图参考"></option><option value="原服装"></option><option value="参考图"></option>
     </datalist>
     <div class="field"><label>标签（逗号分隔）</label><input id="f_tags" placeholder="例如：人物, 写实, 电影感" /></div>
     <div class="field"><label>备注 / 参数（可选）</label><textarea id="f_notes" placeholder="如采样步数、模型版本、负面提示词、调参心得…" style="min-height:60px"></textarea></div>
@@ -366,7 +366,7 @@ function renderImgList(){
     <div class="imgrow">
       <img class="thumb2" src="${escapeHtml(it.data)}" alt="" />
       <div class="ctr">
-        <input list="imgLabels" value="${escapeHtml(it.label||'')}" placeholder="图片标签，如 成果预览图 / 底涂参考 / 原服装" oninput="currentImages[${i}].label=this.value" />
+        <input list="imgLabels" value="${escapeHtml(it.label||'')}" placeholder="图片标签，如 成果预览图 / 底图参考 / 原服装" oninput="currentImages[${i}].label=this.value" />
       </div>
       <div class="acts">
         <button onclick="moveImg(${i},-1)" ${i===0?'disabled':''} title="上移">↑</button>
@@ -381,7 +381,7 @@ function setImgURL(v){ if(v){ if(!currentImages.length) currentImages.push({labe
 function handleImg(e){
   const file=e.target.files[0]; if(!file) return; e.target.value='';
   const reader=new FileReader();
-  reader.onload=evt=>compressImage(evt.target.result, data=>{ currentImages.push({ label: currentImages.length ? '底涂参考' : '成果预览图', data }); renderImgList(); });
+  reader.onload=evt=>compressImage(evt.target.result, data=>{ currentImages.push({ label: currentImages.length ? '底图参考' : '成果预览图', data }); renderImgList(); });
   reader.readAsDataURL(file);
 }
 function compressImage(dataUrl, cb){
