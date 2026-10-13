@@ -484,18 +484,45 @@ function disableSync(){
   toast('已断开同步');
 }
 
+/* ---------- 仓库静态文件兜底（无需 Token，任何浏览器都能看到） ---------- */
+async function loadStaticFallback() {
+  try {
+    const res = await fetch('data/prompts.json', { cache: 'no-cache' });
+    if (!res.ok) return null;
+    const j = await res.json();
+    const data = Array.isArray(j) ? { prompts: j, tombstones: [] } : (j || { prompts: [], tombstones: [] });
+    let list = Array.isArray(data.prompts) ? data.prompts : [];
+    const tomb = Array.isArray(data.tombstones) ? data.tombstones : [];
+    if (tomb.length) list = list.filter(p => !tomb.includes(p.id));
+    return list;
+  } catch (e) { return null; }
+}
+async function fallbackOrEmpty() {
+  if (!prompts.length) {
+    const fb = await loadStaticFallback();
+    if (fb && fb.length) {
+      prompts = fb;
+      saveLocal(); // 缓存到本地：下次秒开且可离线
+      const bar = document.getElementById('syncText');
+      if (bar) bar.textContent = '已从仓库静态文件加载 ' + fb.length + ' 条（未启用同步，仅本地缓存）。点右上角「未同步」配置后可双向同步。';
+      toast('已从仓库加载 ' + fb.length + ' 条提示词');
+    }
+  }
+  refreshStats(); applyFilter();
+}
+
 /* ---------- Init ---------- */
-function init(){
+async function init(){
   if(sync.enabled){
     setPill('sync','同步中…');
     document.getElementById('syncBtn').style.display='inline-block';
     document.getElementById('syncText').textContent='已连接 GitHub 仓库 '+sync.owner+'/'+sync.repo+'，数据自动同步。';
     pullSync().then(()=>{ setPill('ok','已同步 ✓'); refreshStats(); applyFilter(); })
-      .catch(e=>{ setPill('err', e.message==='TOKEN_INVALID'?'Token 失效':'同步失败'); refreshStats(); applyFilter(); toast('拉取失败，已使用本地数据'); });
+      .catch(async e=>{ setPill('err', e.message==='TOKEN_INVALID'?'Token 失效':'同步失败'); await fallbackOrEmpty(); toast('拉取失败，已用仓库静态文件兜底'); });
   } else {
     setPill('off','未同步');
     document.getElementById('syncbar').style.display='flex';
-    refreshStats(); applyFilter();
+    await fallbackOrEmpty();
   }
 }
 init();
